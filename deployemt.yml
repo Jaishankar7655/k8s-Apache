@@ -9,7 +9,7 @@ spec:
   selector:
     matchLabels:
       app: apache
-  templates:
+  template:
     metadata:
      name: apache
      labels:
@@ -19,9 +19,9 @@ spec:
        - name: apache
          image: httpd:latest
          ports:
-           - containerPorts: 80
+           - containerPort: 80
          resources:
-           request:
+           requests:
             cpu: 100m
             memory: 128Mi
            limits:
