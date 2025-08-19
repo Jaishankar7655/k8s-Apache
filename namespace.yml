@@ -1,5 +1,8 @@
-kind: Namespace 
-apiVersion: v1
+# Namespace Manifest
+# This file defines the 'apache' namespace for organizing and isolating resources.
+
+apiVersion: v1           # API version for Namespace
+kind: Namespace          # Resource type
 
 metadata:
-  name: apache
+  name: apache           # Name of the namespace

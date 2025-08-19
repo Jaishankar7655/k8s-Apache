@@ -1,15 +1,20 @@
-kind: Service
-apiVersion: v1
+# Apache Service Manifest
+# This file defines a Service to expose the Apache Deployment within the 'apache' namespace.
+
+apiVersion: v1                # API version for Service
+kind: Service                 # Resource type
+
 metadata:
-  name: apache-service
-  namespace: Apache
+  name: apache-service        # Name of the Service
+  namespace: apache           # Namespace where the Service is created
+
 spec:
   selector:
-    app: apache
+    app: apache               # Selects pods with label 'app: apache'
 
   ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 80
-  type: ClusterIP
-  
+    - protocol: TCP           # Protocol used by the Service
+      port: 80                # Port exposed by the Service
+      targetPort: 80          # Port on the pod to forward traffic to
+
+  type: ClusterIP             # Service type (internal cluster access)
