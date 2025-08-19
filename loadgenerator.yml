@@ -1,1 +1,0 @@
-kubectl run -it loadgenerator --image=busybox -n apache  -- /bin/sh
