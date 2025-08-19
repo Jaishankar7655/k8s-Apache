@@ -1,0 +1,29 @@
+kind: Deplyoment
+apiVersion: apps/v1
+
+metadata:
+  name: apache-deployment
+  namespace: Apache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apache
+  templates:
+    metadata:
+     name: apache
+     labels:
+       app: apache
+    spec:
+      containers:
+       - name: apache
+         image: httpd:latest
+         ports:
+           - containerPorts: 80
+         resources:
+           request:
+            cpu: 100m
+            memory: 128Mi
+           limits:
+             cpu: 200m
+             memory : 256Mi
