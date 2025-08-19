@@ -67,7 +67,7 @@ cd autoscaler/vertical-pod-autoscaler
 ./hack/vpa-up.sh
 
 # Verify installations
-kubectl get pods -n kube-system
+kubectl get pods -n apache
 kubectl top nodes
 ```
 
@@ -176,10 +176,10 @@ spec:
 ### Step 1: Apply all manifests
 ```bash
 kubectl apply -f namespace.yaml
-kubectl apply -f apache-deployment.yaml
-kubectl apply -f apache-service.yaml
-kubectl apply -f apache-hpa.yaml
-kubectl apply -f apache-vpa.yaml
+kubectl apply -f deployment.yaml
+kubectl apply -f service.yaml
+kubectl apply -f hpa.yaml
+kubectl apply -f vpa.yaml
 ```
 
 ![Kubectl Apply](https://i.imgur.com/VjKGb8K.png)
