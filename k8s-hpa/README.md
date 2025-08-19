@@ -1,6 +1,6 @@
-# 🚀 Apache HTTP Server with Kubernetes HPA & VPA
+# 🚀 Apache HTTP Server with Kubernetes HPA (Horizontal Pod Autoscaler)
 
-> **Deploy Apache on Kind cluster with automatic horizontal & vertical scaling using HPA and VPA**
+> **Deploy Apache on Kind cluster with automatic horizontal scaling using HPA**
 
 ![Apache](https://httpd.apache.org/images/httpd_logo_wide_new.png)
 
@@ -28,10 +28,6 @@
     │  │  │    │      HPA        │            │││
     │  │  │    │  (Auto Scaler)  │            │││
     │  │  │    └─────────────────┘            │││
-    │  │  │    ┌─────────────────┐            │││
-    │  │  │    │      VPA        │            │││
-    │  │  │    │ (Resource Opt.) │            │││
-    │  │  │    └─────────────────┘            │││
     │  │  └─────────────────────────────────────┘││
     │  └─────────────────────────────────────────┘│
     └─────────────────────────────────────────────┘
@@ -45,7 +41,7 @@
 - **Kind** cluster setup
 - **Metrics Server** enabled
 
-### Setup Kind, Metrics Server & VPA
+### Setup Kind & Metrics Server
 
 ```bash
 # Install Metrics Server
@@ -61,13 +57,8 @@ kubectl -n kube-system edit deployment metrics-server
 # Restart the deployment
 kubectl -n kube-system rollout restart deployment metrics-server
 
-# Setup VPA
-git clone https://github.com/kubernetes/autoscaler.git
-cd autoscaler/vertical-pod-autoscaler
-./hack/vpa-up.sh
-
-# Verify installations
-kubectl get pods -n apache
+# Verify installation
+kubectl get pods -n kube-system | grep metrics-server
 kubectl top nodes
 ```
 
@@ -132,21 +123,7 @@ spec:
   type: ClusterIP
 ```
 
-### 5. **VPA** (`apache-vpa.yaml`)
-```yaml
-apiVersion: autoscaling.k8s.io/v1
-kind: VerticalPodAutoscaler
-metadata:
-  name: apache-vpa
-  namespace: apache
-spec:
-  targetRef:
-    name: apache-deployment
-    apiVersion: apps/v1
-    kind: Deployment
-  updatePolicy:
-    updateMode: "Auto"
-```
+### 4. **HPA Configuration** (`apache-hpa.yaml`)
 ```yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -176,23 +153,18 @@ spec:
 ### Step 1: Apply all manifests
 ```bash
 kubectl apply -f namespace.yaml
-kubectl apply -f deployment.yaml
-kubectl apply -f service.yaml
-kubectl apply -f hpa.yaml
-kubectl apply -f vpa.yaml
+kubectl apply -f apache-deployment.yaml
+kubectl apply -f apache-service.yaml
+kubectl apply -f apache-hpa.yaml
 ```
-
-![Kubectl Apply](https://i.imgur.com/VjKGb8K.png)
 
 ### Step 2: Verify deployment
 ```bash
 kubectl get pods -n apache
 kubectl get svc -n apache
 kubectl get hpa -n apache
-kubectl get vpa -n apache
+kubectl describe hpa apache-hpa -n apache
 ```
-
-![Kubectl Get Resources](https://i.imgur.com/7vWJZcH.png)
 
 ### Step 3: Port forward for access
 ```bash
@@ -201,60 +173,175 @@ kubectl port-forward svc/apache-service 82:80 --address 0.0.0.0 -n apache
 
 Access at: `http://YOUR_EC2_IP:82`
 
-![Apache Welcome Page](https://i.imgur.com/ZjBj5cF.png)
+---
+
+## 🧪 Load Testing & HPA in Action
+
+### Generate CPU load using BusyBox:
+```bash
+# Create a load generator pod
+kubectl run -i --tty load-generator --rm --image=busybox --restart=Never -- /bin/sh
+```
+
+Inside the load generator container:
+```bash
+# Generate continuous traffic to apache service
+while true; do 
+  for i in $(seq 1 100); do
+    wget -q -O- http://apache-service.apache.svc.cluster.local &
+  done
+  sleep 1
+done
+```
+
+### Monitor HPA scaling in real-time:
+```bash
+# Watch HPA scaling events
+kubectl get hpa -n apache -w
+
+# Monitor pod scaling
+kubectl get pods -n apache -w
+
+# Check resource usage
+kubectl top pods -n apache
+```
+
+### HPA Commands for Monitoring:
+```bash
+# Get detailed HPA status
+kubectl describe hpa apache-hpa -n apache
+
+# Check HPA events
+kubectl get events -n apache --sort-by=.metadata.creationTimestamp
+
+# Monitor CPU utilization
+kubectl top pods -n apache --containers
+```
+
+## 📊 HPA Behavior & Expected Results
+
+### HPA Scaling Logic:
+- **Target CPU**: 50% utilization
+- **Scale Up**: When average CPU > 50% for 3 minutes
+- **Scale Down**: When average CPU < 50% for 5 minutes
+- **Min Replicas**: 1 pod
+- **Max Replicas**: 10 pods
+
+### HPA Scaling Timeline:
+```
+Load Increase → CPU > 50% → Wait 3 mins → Scale Up
+Load Decrease → CPU < 50% → Wait 5 mins → Scale Down
+```
+
+### Sample HPA Output:
+```bash
+$ kubectl get hpa -n apache
+NAME         REFERENCE                     TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+apache-hpa   Deployment/apache-deployment   75%/50%   1         10        3          5m
+```
+
+### HPA Status Messages:
+- `ScalingActive`: HPA is actively monitoring and scaling
+- `AbleToScale`: Ready to scale up/down
+- `ScalingLimited`: Hit min/max replica limits
 
 ---
 
-## 🧪 Load Testing
+## 🔧 Advanced HPA Configuration
 
-### Generate load using BusyBox:
-```bash
-kubectl run -i --tty load-generator --image=busybox /bin/sh
+### Memory-based scaling:
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: apache-hpa-advanced
+  namespace: apache
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: apache-deployment
+  minReplicas: 2
+  maxReplicas: 15
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
 ```
 
-![Load Generator](https://i.imgur.com/Xj3KQsP.png)
+---
 
-Inside container:
+## 📈 Monitoring & Troubleshooting
+
+### Common Issues:
+1. **HPA shows "unknown" metrics**:
+   ```bash
+   kubectl describe hpa apache-hpa -n apache
+   # Check if metrics-server is running
+   kubectl get pods -n kube-system | grep metrics
+   ```
+
+2. **Pods not scaling**:
+   ```bash
+   # Check resource requests are defined
+   kubectl describe pod <pod-name> -n apache
+   
+   # Verify HPA conditions
+   kubectl get hpa apache-hpa -n apache -o yaml
+   ```
+
+3. **Scaling too slow**:
+   ```bash
+   # Check HPA behavior settings
+   kubectl describe hpa apache-hpa -n apache
+   ```
+
+### Useful Monitoring Commands:
 ```bash
-while true; do wget -q -O- http://apache-service.apache.svc.cluster.local; done
+# Real-time resource monitoring
+watch kubectl top pods -n apache
+
+# HPA decision logs
+kubectl describe hpa apache-hpa -n apache | grep Events -A 10
+
+# Check deployment scaling events
+kubectl describe deployment apache-deployment -n apache
 ```
-
-### Monitor HPA & VPA scaling:
-```bash
-# Watch HPA scaling
-kubectl get hpa -n apache -w
-
-# Check VPA recommendations
-kubectl get vpa -n apache
-kubectl describe vpa apache-vpa -n apache
-```
-
-![HPA Scaling](https://i.imgur.com/M8kRtNx.png)
-
-## 📊 Expected Results
-
-### HPA (Horizontal Pod Autoscaler):
-- **CPU < 50%**: Scales down to 1 pod
-- **CPU > 50%**: Scales up (max 10 pods)  
-- **Scaling time**: ~30 seconds up, ~5 minutes down
-
-### VPA (Vertical Pod Autoscaler):
-- **Automatically adjusts** CPU and memory requests
-- **Restarts pods** with new resource limits
-- **Optimizes** resource utilization
-
-### HPA & VPA in Action:
-![HPA Dashboard](https://i.imgur.com/4BcLp2Y.png)
-![VPA Dashboard](https://i.imgur.com/V9kPq3L.png)
 
 ---
 
 ## 🧹 Cleanup
 
 ```bash
+# Delete HPA first
+kubectl delete hpa apache-hpa -n apache
+
+# Delete entire namespace
 kubectl delete namespace apache
 ```
 
 ---
 
-**🎯 That's it! Your Apache server will now automatically scale both horizontally (more pods) and vertically (more resources per pod) based on usage.**
+**🎯 Your Apache server now automatically scales horizontally based on CPU utilization! HPA will add more pods when traffic increases and remove them when traffic decreases.**

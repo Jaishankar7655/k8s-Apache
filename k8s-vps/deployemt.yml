@@ -1,0 +1,35 @@
+# Apache Deployment Manifest
+# This file defines a Deployment for running Apache HTTP Server pods in the 'apache' namespace.
+
+apiVersion: apps/v1           # API version for Deployment
+kind: Deployment              # Resource type
+
+metadata:
+  name: apache-deployment     # Name of the Deployment
+  namespace: apache           # Namespace for the Deployment
+
+spec:
+  replicas: 1                 # Number of desired pods
+  selector:
+    matchLabels:
+      app: apache             # Label selector for pods managed by this Deployment
+
+  template:
+    metadata:
+      name: apache            # Name for the pod template (optional)
+      labels:
+        app: apache           # Labels for pod selection and service targeting
+
+    spec:
+      containers:
+        - name: apache        # Name of the container
+          image: httpd:latest # Apache HTTP Server image
+          ports:
+            - containerPort: 80  # Port exposed by the container
+          resources:
+            requests:
+              cpu: 100m          # Minimum CPU required
+              memory: 128Mi      # Minimum memory required
+            limits:
+              cpu: 200m          # Maximum CPU allowed
+              memory: 256Mi      # Maximum memory allowed
