@@ -3,7 +3,7 @@ apiVersion: apps/v1
 
 metadata:
   name: apache-deployment
-  namespace: Apache
+  namespace: apache
 spec:
   replicas: 1
   selector:
